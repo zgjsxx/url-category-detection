@@ -1,33 +1,43 @@
+# -*- coding: UTF-8 -*- 
+from flask import Flask, request, Response
+import json
 import pickle
 import config
 import argparse
 from functions import scrape_url
 
+app = Flask(__name__)
+
 pickle_in = open(config.WORDS_FREQUENCY_PATH, "rb")
 words_frequency = pickle.load(pickle_in)
 
-parser = argparse.ArgumentParser(description='URLs for category predictions')
-parser.add_argument('-u', '--url', help='Predict custom website')
-parser.add_argument('-t', '--text_file_path', help='Predict websites written in text file')
+@app.route('/url_detect', methods=['POST'])
+def detection():
+    '''
+    {
+        "url" : "https://www.baidu.com"
+    }
+    '''
 
-args = parser.parse_args()
+    req_body = request.json
+    print(req_body)
+    url = req_body["url"]
+    try:
+        results = scrape_url(url, words_frequency)
+        if results:
+            print('Predicted main category:', results[0])
+            print('Predicted submain category:', results[2])
+            resp = {}
+            resp["category"] = results[0]
+            return Response(json.dumps(resp), mimetype='application/json')
+        else:
+            resp = {}
+            resp["category"] = "na"
+            return Response(json.dumps(resp), mimetype='application/json')
+    except:
+            resp = {}
+            resp["category"] = "na"
+            return Response(json.dumps(resp), mimetype='application/json')        
 
-if args.url:
-    url = args.url
-    print(url)
-    results = scrape_url(url, words_frequency)
-    if results:
-        print('Predicted main category:', results[0])
-        print('Predicted submain category:', results[2])
-elif args.text_file_path:
-    file_path = args.text_file_path
-    with open(file_path) as f:
-        for url in f:
-            url = url.replace('\n', '')
-            print(url)
-            results = scrape_url(url.replace('\n', ''), words_frequency)
-            if results:
-                print('Predicted main category:', results[0])
-                print('Predicted submain category:', results[2])
-else:
-    parser.error("Please specify websites input type. More about input types you can find 'python predict_url -h'")
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=8081)
